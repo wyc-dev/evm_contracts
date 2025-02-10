@@ -19,7 +19,7 @@ error TransactionExceedsLimit();
  * @dev An ERC20 token with a built-in liquidity pool mechanism, claimable airdrops, and Pay-to-Earn functionality.
  *      This contract allows users to buy and sell TEST tokens with ETH, claim airdrops, and earn rewards through payments.
  *      Built on OpenZeppelin's ERC20 and ReentrancyGuard for security and reliability.
- * @custom:security-contact security@example.com
+ * @custom:security-contact wyc.emote732@passinbox.com
  */
 contract TEST is ERC20, ReentrancyGuard {
 
@@ -51,7 +51,7 @@ contract TEST is ERC20, ReentrancyGuard {
      * @param circulatingSupply The updated circulating supply.
      * @param claimable The updated claimable token amount.
      */
-    event SupplyUpdated(uint256 circulatingSupply, uint256 claimable);
+    event SupplyUpdated(uint256 indexed circulatingSupply, uint256 indexed claimable);
 
     /**
      * @dev Public state variable tracking the circulating supply of TEST tokens.
@@ -65,9 +65,9 @@ contract TEST is ERC20, ReentrancyGuard {
     uint256 public claimable = 10000 * 10 ** decimals();
 
     /**
-     * @dev Public constant state variable representing the slippage percentage.
+     * @dev Public constant state variable representing the SILPPAGE percentage.
      */
-    uint256 public constant slippage = 1;
+    uint256 public constant SILPPAGE = 1;
 
     /**
      * @dev Constructor to mint the initial token supply.
@@ -83,12 +83,14 @@ contract TEST is ERC20, ReentrancyGuard {
 
     /**
      * @notice Calculates the amount of TEST tokens a user will receive when purchasing with 1 ETH.
-     * @return The number of TEST tokens the user will receive after applying slippage.
+     * @return The number of TEST tokens the user will receive after applying SILPPAGE.
      */
     function calculatePurchaseAmount() public view returns (uint256) {
-        // Calculate purchase amount including a slippage fee.
-        // For 1 ETH, determine TEST tokens equivalent considering remaining liquidity and slippage.
-        return (1 * balanceOf(address(this)) * (100 - slippage)) / ((10 ** decimals()) * 100000);
+        // Perform all multiplications before any division to reduce precision loss.
+        uint256 tokenBalance = balanceOf(address(this));
+        uint256 numerator = tokenBalance * (100 - SILPPAGE);
+        uint256 denominator = (10 ** decimals()) * 100000;
+        return numerator / denominator;
     }
 
     /**
@@ -98,8 +100,9 @@ contract TEST is ERC20, ReentrancyGuard {
     function calculateSellAmount() public view returns (uint256) {
         // Ensure there is ETH in the pool.
         if (address(this).balance == 0) revert NoEthInPool();
-        // Calculate sell amount without slippage.
-        return (1 * 10 ** decimals() * address(this).balance) / circulatingSupply;
+        // Multiply first to reduce loss of precision.
+        uint256 numerator = (10 ** decimals()) * address(this).balance;
+        return numerator / circulatingSupply;
     }
 
     /**
@@ -109,7 +112,7 @@ contract TEST is ERC20, ReentrancyGuard {
      * @param tokenAmount The amount of TEST tokens to sell (in token units, not considering decimals).
      */
     function sellTEST(uint256 tokenAmount) external nonReentrant {
-        uint256 tokenAmountWithDecimals = tokenAmount * 10 ** decimals();
+        uint256 tokenAmountWithDecimals = tokenAmount * (10 ** decimals());
         // Ensure the seller has sufficient TEST balance.
         if (balanceOf(_msgSender()) < tokenAmountWithDecimals) revert InsufficientTESTBalance();
         uint256 ethAmount = tokenAmount * calculateSellAmount();
@@ -166,7 +169,7 @@ contract TEST is ERC20, ReentrancyGuard {
 
     /**
      * @notice Buys TEST tokens using ETH, optionally including a referral bonus.
-     * @dev Calculates token amount considering slippage, transfers tokens, and updates state.
+     * @dev Calculates token amount considering SILPPAGE, transfers tokens, and updates state.
      *      Emits a {TESTBought} event and a {SupplyUpdated} event.
      * @param friend The referrer address, if applicable.
      */
@@ -174,8 +177,8 @@ contract TEST is ERC20, ReentrancyGuard {
         // Ensure tokens are available for purchase in the contract pool.
         if (balanceOf(address(this)) == 0) revert NoMoreTokensAvailable();
         // Limit each transaction to a maximum of 99 ETH.
-        if (msg.value > 99 * 10 ** decimals()) revert TransactionExceedsLimit();
-        // Calculate the amount of TEST tokens to be bought considering slippage.
+        if (msg.value > 99 * (10 ** decimals())) revert TransactionExceedsLimit();
+        // Calculate the amount of TEST tokens to be bought considering SILPPAGE.
         uint256 amount = msg.value * calculatePurchaseAmount();
         uint256 friendBonus = (amount * 10) / 100;
         if (friend != address(0) && friend != _msgSender()) {
