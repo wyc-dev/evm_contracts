@@ -26,14 +26,13 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
     /// @dev Struct to store merchant details
     struct Merchant {
         uint256 totalCashReceived;  ///< Total cash received by the merchant
-        uint256 totalHKDPReceived;  ///< Total HKDP received by the merchant
+        uint256 totalHKDPRecycled;  ///< Total HKDP received by the merchant
         string name;                ///< Name of the merchant
         address merchantAddress;    ///< Address of the merchant
         bool isImbalanced;          ///< Whether cash received > HKDP received
     }
 
     /// @notice Stores merchant data with a mapping
-    /// @dev Uses named parameters for clarity
     mapping(address merchantAddress => Merchant merchantInfo) public merchants;
 
     /// @notice Whitelist to track authorized merchants
@@ -72,19 +71,26 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
     {}
 
     /**
-     * @notice Adds a merchant to the whitelist.
-     * @dev Only the contract owner can add merchants.
+     * @notice Adds or updates a merchant in the whitelist.
+     * @dev Only the contract owner can add or update merchants.
      * @param merchant The merchant's address.
      * @param name The merchant's name.
      */
     function addMerchant(address merchant, string memory name) external onlyOwner {
         if (merchant == address(0)) revert InvalidMerchantAddress();
-        if (merchantWhitelist[merchant]) revert MerchantAlreadyWhitelisted();
-
         merchantWhitelist[merchant] = true;
         merchants[merchant] = Merchant(0, 0, name, merchant, false);
-        merchantList.push(merchant);
-
+        bool found;
+        uint256 length = merchantList.length;
+        for (uint256 i; i < length; ++i) {
+            if (merchantList[i] == merchant) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            merchantList.push(merchant);
+        }
         emit MerchantAdded(merchant, name);
     }
 
@@ -95,25 +101,22 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
      */
     function removeMerchant(address merchant) external onlyOwner {
         if (!merchantWhitelist[merchant]) revert MerchantNotFound();
-
         merchantWhitelist[merchant] = false;
         delete merchants[merchant];
-
         // Gas-efficient removal using `swap and pop`
         uint256 length = merchantList.length;
-        for (uint256 i; i < length; ++i) { // No need to initialize i to 0 explicitly
+        for (uint256 i; i < length; ++i) {
             if (merchantList[i] == merchant) {
                 merchantList[i] = merchantList[length - 1];
                 merchantList.pop();
                 break;
             }
         }
-
         emit MerchantRemoved(merchant);
     }
 
     /**
-     * @notice Mints HKDP tokens for a user.
+     * @notice Mints HKDP tokens for a user, ensuring it does not exceed dynamic mint allowance.
      * @dev Only whitelisted merchants can mint tokens.
      * @param user The user receiving the HKDP tokens.
      * @param cashAmount The amount of HKDP to mint.
@@ -122,13 +125,10 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
         if (!merchantWhitelist[_msgSender()]) revert NotAuthorizedMerchant();
         if (user == address(0)) revert InvalidUserAddress();
         if (cashAmount == 0) revert InvalidAmount();
-
-        _mint(user, cashAmount);
-
         Merchant storage merchant = merchants[_msgSender()];
+        _mint(user, cashAmount);
         merchant.totalCashReceived += cashAmount;
-        merchant.isImbalanced = merchant.totalCashReceived > merchant.totalHKDPReceived;
-
+        merchant.isImbalanced = merchant.totalCashReceived > merchant.totalHKDPRecycled;
         emit MintedByMerchant(_msgSender(), user, cashAmount, cashAmount, merchant.isImbalanced);
     }
 
@@ -141,42 +141,10 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
     function payMerchant(address user, uint256 amount) external nonReentrant {
         if (!merchantWhitelist[_msgSender()]) revert NotRegisteredMerchant();
         if (amount == 0 || balanceOf(user) < amount) revert InvalidAmount();
-
         _transfer(user, _msgSender(), amount);
-
         Merchant storage merchant = merchants[_msgSender()];
-        merchant.totalHKDPReceived += amount;
-        merchant.isImbalanced = merchant.totalCashReceived > merchant.totalHKDPReceived;
-
+        merchant.totalHKDPRecycled += amount;
+        merchant.isImbalanced = merchant.totalCashReceived > merchant.totalHKDPRecycled;
         emit PaymentProcessed(_msgSender(), user, amount);
-    }
-
-    /**
-     * @notice Returns a list of merchants with cash inflows exceeding HKDP received.
-     * @return An array of merchant addresses with imbalances.
-     */
-    function getImbalancedMerchants() external view returns (address[] memory) {
-        uint256 count;
-        uint256 length = merchantList.length; // Cache array length
-
-        // First pass: count merchants with imbalances
-        for (uint256 i; i < length; ++i) { // No need to initialize i to 0 explicitly
-            if (merchants[merchantList[i]].isImbalanced) {
-                ++count;
-            }
-        }
-
-        // Second pass: collect imbalanced merchants
-        address[] memory imbalancedMerchants = new address[](count);
-        uint256 index;
-
-        for (uint256 i; i < length; ++i) { // No need to initialize i to 0 explicitly
-            if (merchants[merchantList[i]].isImbalanced) {
-                imbalancedMerchants[index] = merchantList[i];
-                ++index;
-            }
-        }
-
-        return imbalancedMerchants;
     }
 }
