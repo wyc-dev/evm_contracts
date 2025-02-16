@@ -25,24 +25,39 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
 
     /// @dev Struct to store merchant details
     struct Merchant {
-        uint256 totalCashReceived;
-        uint256 totalHKDPReceived;
-        string name;
-        address merchantAddress;
-        bool isImbalanced;
+        uint256 totalCashReceived;  ///< Total cash received by the merchant
+        uint256 totalHKDPReceived;  ///< Total HKDP received by the merchant
+        string name;                ///< Name of the merchant
+        address merchantAddress;    ///< Address of the merchant
+        bool isImbalanced;          ///< Whether cash received > HKDP received
     }
 
-    /// @dev Mapping of merchants with named parameters
+    /// @notice Stores merchant data with a mapping
+    /// @dev Uses named parameters for clarity
     mapping(address merchantAddress => Merchant merchantInfo) public merchants;
+
+    /// @notice Whitelist to track authorized merchants
     mapping(address merchantAddress => bool isWhitelisted) public merchantWhitelist;
 
     /// @dev List of merchants for iteration
     address[] public merchantList;
 
-    /// @dev Events for state changes
+    /// @notice Emitted when a new merchant is added
     event MerchantAdded(address indexed merchant, string name);
+
+    /// @notice Emitted when a merchant is removed
     event MerchantRemoved(address indexed merchant);
-    event MintedByMerchant(address indexed merchant, address indexed user, uint256 cashAmount, uint256 hkdpMinted, bool isImbalanced);
+
+    /// @notice Emitted when a merchant mints HKDP for a user
+    event MintedByMerchant(
+        address indexed merchant, 
+        address indexed user, 
+        uint256 cashAmount, 
+        uint256 hkdpMinted, 
+        bool isImbalanced
+    );
+
+    /// @notice Emitted when a user pays a merchant using HKDP
     event PaymentProcessed(address indexed merchant, address indexed user, uint256 amount);
 
     /**
@@ -86,7 +101,7 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
 
         // Gas-efficient removal using `swap and pop`
         uint256 length = merchantList.length;
-        for (uint256 i = 0; i < length; ++i) {
+        for (uint256 i; i < length; ++i) { // No need to initialize i to 0 explicitly
             if (merchantList[i] == merchant) {
                 merchantList[i] = merchantList[length - 1];
                 merchantList.pop();
@@ -145,7 +160,7 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
         uint256 length = merchantList.length; // Cache array length
 
         // First pass: count merchants with imbalances
-        for (uint256 i = 0; i < length; ++i) {
+        for (uint256 i; i < length; ++i) { // No need to initialize i to 0 explicitly
             if (merchants[merchantList[i]].isImbalanced) {
                 ++count;
             }
@@ -155,7 +170,7 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
         address[] memory imbalancedMerchants = new address[](count);
         uint256 index;
 
-        for (uint256 i = 0; i < length; ++i) {
+        for (uint256 i; i < length; ++i) { // No need to initialize i to 0 explicitly
             if (merchants[merchantList[i]].isImbalanced) {
                 imbalancedMerchants[index] = merchantList[i];
                 ++index;
