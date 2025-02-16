@@ -40,6 +40,12 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
     /// @dev List of merchants for iteration
     address[] public merchantList;
 
+    /// @notice Total HKDP tokens minted
+    uint256 public totalMinted;
+    
+    /// @notice Total HKDP tokens burnt
+    uint256 public totalBurnt;
+
     /// @notice Emitted when a new merchant is added
     event MerchantAdded(address indexed merchant, string name);
 
@@ -128,6 +134,7 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
         _mint(user, cashAmount);
         merchant.totalCashReceived += cashAmount;
         merchant.isImbalanced = merchant.totalCashReceived > merchant.totalHKDPRecycled;
+        totalMinted += cashAmount;
         emit MintedByMerchant(_msgSender(), user, cashAmount, cashAmount, merchant.isImbalanced);
     }
 
@@ -140,10 +147,11 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
     function payMerchant(address user, uint256 amount) external nonReentrant {
         if (!merchantWhitelist[_msgSender()]) revert NotRegisteredMerchant();
         if (amount == 0 || balanceOf(user) < amount) revert InvalidAmount();
-        _transfer(user, _msgSender(), amount);
+        _burn(user, amount);
         Merchant storage merchant = merchants[_msgSender()];
         merchant.totalHKDPRecycled += amount;
         merchant.isImbalanced = merchant.totalCashReceived > merchant.totalHKDPRecycled;
+        totalBurnt += amount;
         emit PaymentProcessed(_msgSender(), user, amount);
     }
 }
