@@ -16,7 +16,6 @@ contract HKDP is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
     
     /// @dev Custom errors for gas optimization
     error InvalidMerchantAddress();
-    error MerchantAlreadyWhitelisted();
     error MerchantNotFound();
     error NotAuthorizedMerchant();
     error InvalidUserAddress();
