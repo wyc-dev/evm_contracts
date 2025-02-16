@@ -54,9 +54,8 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
     /**
      * @dev Emitted whenever the circulating supply or claimable supply is updated.
      * @param circulatingSupply The updated circulating supply.
-     * @param claimable The updated claimable token amount.
      */
-    event SupplyUpdated(uint256 indexed circulatingSupply, uint256 indexed claimable);
+    event SupplyUpdated(uint256 indexed circulatingSupply);
 
     /**
      * @dev Emitted when a user stakes Volt tokens.
@@ -153,7 +152,7 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
         if (ethAmount > address(this).balance) revert InsufficientETHInReserve();
         // Update circulating supply before token transfer.
         circulatingSupply -= tokenAmountWithDecimals;
-        emit SupplyUpdated(circulatingSupply, claimable);
+        emit SupplyUpdated(circulatingSupply);
         // Transfer Volt tokens from seller to contract.
         _transfer(_msgSender(), address(this), tokenAmountWithDecimals);
         // Transfer ETH to seller using call method.
@@ -188,13 +187,13 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
             // Update claimable and circulating supply.
             claimable -= (totalClaim + friendBonus);
             circulatingSupply += (totalClaim + friendBonus);
-            emit SupplyUpdated(circulatingSupply, claimable);
+            emit SupplyUpdated(circulatingSupply);
         } else {
             // Transfer only the base claim amount.
             _transfer(address(this), _msgSender(), amount);
             claimable -= amount;
             circulatingSupply += amount;
-            emit SupplyUpdated(circulatingSupply, claimable);
+            emit SupplyUpdated(circulatingSupply);
         }
         // Emit claim event for the claimer.
         emit VoltClaimed(_msgSender(), amount);
@@ -225,7 +224,7 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
         } else {
             circulatingSupply += amount;
         }
-        emit SupplyUpdated(circulatingSupply, claimable);
+        emit SupplyUpdated(circulatingSupply);
         // Transfer purchased tokens to the buyer.
         _transfer(address(this), _msgSender(), amount);
         // Emit purchase event.
@@ -261,11 +260,13 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
         // Update staking balances
         stakedBalance[_msgSender()] -= tokenAmount;
         totalStaked -= tokenAmount;
+        circulatingSupply -= amount;
         // Burn the unstaked Volt tokens
         _burn(address(this), tokenAmount);
         // Send ETH to user
         (bool sent, ) = payable(_msgSender()).call{value: ethAmount}("");
         if (!sent) revert FailedToSendETH();
+        emit SupplyUpdated(circulatingSupply);
         emit VoltUnstaked(_msgSender(), tokenAmount, ethAmount);
     }
 
@@ -278,7 +279,7 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
         uint256 amount = msg.value * calculatePurchaseAmount();
         _transfer(address(this), _msgSender(), amount);
         circulatingSupply += amount;
-        emit SupplyUpdated(circulatingSupply, claimable);
+        emit SupplyUpdated(circulatingSupply);
         emit VoltBought(_msgSender(), msg.value, amount);
     }
 
@@ -291,7 +292,7 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
         uint256 amount = msg.value * calculatePurchaseAmount();
         _transfer(address(this), _msgSender(), amount);
         circulatingSupply += amount;
-        emit SupplyUpdated(circulatingSupply, claimable);
+        emit SupplyUpdated(circulatingSupply);
         emit VoltBought(_msgSender(), msg.value, amount);
     }
 }
