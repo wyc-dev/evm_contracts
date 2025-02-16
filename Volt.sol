@@ -92,7 +92,7 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
     /**
      * @dev Mapping to track each user's staked Volt balance.
      */
-    mapping(address => uint256) public stakedBalance;
+    mapping(address staker => uint256 balance) public stakedBalance;
 
     /**
      * @dev Constructor for the Volt token contract.
@@ -112,20 +112,6 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
         _mint(_msgSender(), 100000 * 10 ** decimals());
         // Mint tokens reserved for the internal swapping pool.
         _mint(address(this), 900000 * 10 ** decimals());
-    }
-
-    /**
-     * @dev Override required by Solidity.
-     * Provides a hook for updating internal token accounting as defined in the ERC20 contract.
-     * This override simply calls the parent implementation, ensuring that any logic in the base contract is preserved.
-     * (Note: In the standard OpenZeppelin ERC20, an _update function may not exist;
-     *       this override is included to satisfy interface or custom extension requirements.)
-     */
-    function _update(address from, address to, uint256 value)
-        internal
-        override(ERC20)
-    {
-        super._update(from, to, value);
     }
 
     /**
@@ -253,9 +239,9 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
     function stakeVolt(uint256 amount) external nonReentrant {
         uint256 tokenAmount = amount * (10 ** decimals());
         if (balanceOf(_msgSender()) < tokenAmount) revert InsufficientVoltBalance();
-        // Transfer Volt from the user to the contract
+        // Transfer Volt from user to contract
         _transfer(_msgSender(), address(this), tokenAmount);
-        // Update staked balance and total staked amount
+        // Update staking data
         stakedBalance[_msgSender()] += tokenAmount;
         totalStaked += tokenAmount;
         emit VoltStaked(_msgSender(), tokenAmount);
@@ -263,7 +249,6 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
 
     /**
      * @notice Allows users to unstake their Volt tokens and receive ETH in exchange.
-     * @dev The withdrawn ETH is calculated based on the user's staked percentage.
      * @param amount The number of Volt tokens to unstake (without decimals).
      */
     function unstakeVolt(uint256 amount) external nonReentrant {
@@ -273,13 +258,12 @@ contract Volt is ERC20, ERC20Permit, ReentrancyGuard, Ownable {
         // Calculate ETH amount based on staking percentage
         uint256 ethAmount = (address(this).balance * tokenAmount) / totalStaked;
         if (ethAmount > address(this).balance) revert NotEnoughETHForUnstake();
-        // Update user's staked balance and total staked amount
+        // Update staking balances
         stakedBalance[_msgSender()] -= tokenAmount;
         totalStaked -= tokenAmount;
-        circulatingSupply -= tokenAmount;
         // Burn the unstaked Volt tokens
         _burn(address(this), tokenAmount);
-        // Send ETH to the user
+        // Send ETH to user
         (bool sent, ) = payable(_msgSender()).call{value: ethAmount}("");
         if (!sent) revert FailedToSendETH();
         emit VoltUnstaked(_msgSender(), tokenAmount, ethAmount);
