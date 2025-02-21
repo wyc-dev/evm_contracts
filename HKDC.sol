@@ -22,7 +22,9 @@ contract HKDC is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
     error InvalidUserAddress();
     error InvalidAmount();
     error NotRegisteredMerchant();
-    error MerchantFrozen();  // 新增錯誤: 商戶已被雪藏
+    error MerchantFrozen();
+    error ETHTransferFailed();
+    error ERC20TransferFailed();
 
     /// @dev 商戶結構
     struct Merchant {
@@ -191,14 +193,14 @@ contract HKDC is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
     /**
      * @notice 內部函數：將收到的 ETH 自動轉帳到 `owner`
      */
-    function _forwardETH() internal {
+    function _forwardETH() private {  // Changed internal → private
         uint256 balance = address(this).balance;
         if (balance > 0) {
             (bool success, ) = payable(owner()).call{value: balance}("");
-            require(success, "ETH transfer failed");
+            if (!success) revert ETHTransferFailed();
         }
     }
-
+    
     /**
      * @notice 允許任何人將 ERC20 代幣轉入，並立即自動轉帳給 `owner`
      * @param token ERC20 代幣地址
@@ -208,6 +210,6 @@ contract HKDC is ERC20, ERC20Permit, Ownable, ReentrancyGuard {
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance == 0) revert InvalidAmount();
         bool success = IERC20(token).transfer(owner(), balance);
-        if (!success) revert("ERC20 transfer failed");
+        if (!success) revert ERC20TransferFailed();
     }
 }
