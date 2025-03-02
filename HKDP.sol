@@ -16,7 +16,6 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     
     /// @dev Custom errors for gas efficiency
     error InvalidMerchantAddress();
-    error MerchantNotFound();
     error InvalidUserAddress();
     error InvalidAmount();
     error NotRegisteredMerchant(address caller);
@@ -29,7 +28,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         uint256 printQuota;         ///< Minting quota
         uint256 totalCashReceived;  ///< Total cash received
         uint256 totalHKDPRecycled;  ///< Total HKDP recycled
-        string  merchantName;        ///< Merchant name
+        string  merchantName;       ///< Merchant name
         address merchantAddress;    ///< Merchant address
         bool isFreeze;              ///< Freeze status
     }
@@ -122,7 +121,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @param merchantAddr Merchant address
      */
     function removeMerchant(address merchantAddr) external onlyOwner {
-        if (!isMerchant[merchantAddr]) revert MerchantNotFound();
+        if (!isMerchant[merchantAddr]) revert InvalidMerchantAddress();
         emit MerchantRemoved(merchantAddr);
         uint256 index = merchantIndex[merchantAddr];
         address lastAddr = merchantList[merchantList.length - 1];
@@ -177,7 +176,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @param printQuota New quota
      */
     function modMerchantState(address merchantAddr, bool isFreeze, uint256 printQuota) external onlyOwner {
-        if (!isMerchant[merchantAddr]) revert MerchantNotFound();
+        if (!isMerchant[merchantAddr]) revert InvalidMerchantAddress();
         Merchant storage m = merchantInfoMap[merchantAddr];
         m.isFreeze = isFreeze;
         if (isFreeze) emit MerchantFreeze(merchantAddr);
@@ -186,27 +185,19 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Forward ERC20 tokens
-     * @dev Owner-only; transfers ERC20 to owner
+     * @notice Withdraw ETH and ERC20 tokens
+     * @dev Owner-only; transfers assets to owner
      * @param token ERC20 token address
      */
-    function forwardERC20(address token) external onlyOwner {
-        if (token == address(0)) revert InvalidMerchantAddress();
-        uint256 contractBalance = IERC20(token).balanceOf(address(this));
-        if (contractBalance == 0) revert InvalidAmount();
-        bool success = IERC20(token).transfer(owner(), contractBalance);
-        if (!success) revert ERC20TransferFailed();
-    }
-
-    /**
-     * @notice Withdraw ETH function
-     * @dev Handles ETH transfers
-     */
-    function withdrawETH() external onlyOwner {
-        uint256 contractBalance = address(this).balance;
-        if (contractBalance > 0) {
-            (bool success, ) = payable(owner()).call{value: contractBalance}("");
+    function withdrawTokensAndETH(address token) external onlyOwner {
+        if (token == address(0) && address(this).balance > 0) {
+            (bool success, ) = payable(owner()).call{value: address(this).balance}("");
             if (!success) revert ETHTransferFailed();
+        } else {
+            uint256 contractBalance = IERC20(token).balanceOf(address(this));
+            if (contractBalance == 0) revert InvalidAmount();
+            bool success = IERC20(token).transfer(owner(), contractBalance);
+            if (!success) revert ERC20TransferFailed();
         }
     }
 
