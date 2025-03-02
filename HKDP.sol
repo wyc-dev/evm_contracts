@@ -19,7 +19,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     error MerchantNotFound();
     error InvalidUserAddress();
     error InvalidAmount();
-    error NotRegisteredMerchant();
+    error NotRegisteredMerchant(address caller);
     error MerchantFrozen();
     error ETHTransferFailed();
     error ERC20TransferFailed();
@@ -34,14 +34,14 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         bool isFreeze;              ///< Freeze status
     }
 
-    /// @notice Maps merchant address to data
-    mapping(address => Merchant) public merchantInfoMap;
+    /// @notice Maps merchant addresses to their information
+    mapping(address merchantAddress => Merchant info) public merchantInfoMap;
 
-    /// @notice Merchants index
-    mapping(address => uint256) public merchantIndex;
+    /// @notice Maps merchant addresses to their index in merchantList
+    mapping(address merchantAddress => uint256 index) public merchantIndex;
 
-    /// @notice Whitelist of merchants
-    mapping(address => bool) public isMerchant;
+    /// @notice Whitelist status of merchant addresses
+    mapping(address merchantAddress => bool isWhitelisted) public isMerchant;
 
     /// @notice List of merchant addresses
     address[] public merchantList;
@@ -84,7 +84,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @dev Merchants-only; to allow only registered merchants
      */
     modifier onlyMerchant() {
-        if (!isMerchant[msg.sender]) { revert NotRegisteredMerchant(); } _;
+        if (!isMerchant[msg.sender]) { revert NotRegisteredMerchant(msg.sender); } _;
     }
 
     /**
@@ -121,22 +121,17 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @dev Owner-only; removes from whitelist and info map
      * @param merchantAddr Merchant address
      */
-    function removeMerchant(address merchantAddr) external onlyOwner nonReentrant {
+    function removeMerchant(address merchantAddr) external onlyOwner {
         if (!isMerchant[merchantAddr]) revert MerchantNotFound();
-        isMerchant[merchantAddr] = false;
+        emit MerchantRemoved(merchantAddr);
+        uint256 index = merchantIndex[merchantAddr];
+        address lastAddr = merchantList[merchantList.length - 1];
+        merchantList[index] = lastAddr;
+        merchantIndex[lastAddr] = index;
+        merchantList.pop();
+        delete merchantIndex[merchantAddr];
         delete merchantInfoMap[merchantAddr];
-        if (isMerchant[merchantAddr]) {
-            uint256 index = merchantIndex[merchantAddr];
-            uint256 lastIndex = merchantList.length - 1;
-            if (index != lastIndex) {
-                address lastAddr = merchantList[lastIndex];
-                merchantList[index] = lastAddr;
-                merchantIndex[lastAddr] = index;
-            }
-            merchantList.pop();
-            delete merchantIndex[merchantAddr];
-            isMerchant[merchantAddr] = false;
-        }
+        isMerchant[merchantAddr] = false;
         emit MerchantRemoved(merchantAddr);
     }
 
@@ -147,16 +142,14 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @param cashAmount Amount to mint
      */
     function mintHKDP(address user, uint256 cashAmount) external onlyMerchant nonReentrant {
-        if (!isMerchant[_msgSender()]) revert NotRegisteredMerchant();
         if (user == address(0)) revert InvalidUserAddress();
-        if (cashAmount == 0) revert InvalidAmount();
-        Merchant storage merchant = merchantInfoMap[_msgSender()];
-        if (merchant.isFreeze) revert MerchantFrozen();
-        if (merchant.totalCashReceived + cashAmount > merchant.printQuota) 
-            revert InvalidAmount(); // Enforce quota
-        emit MintedToUser(_msgSender(), user, cashAmount);
+        Merchant storage m  = merchantInfoMap[msg.sender];
+        if (cashAmount == 0 || cashAmount > m.printQuota + m.totalHKDPRecycled - m.totalCashReceived)
+            revert InvalidAmount();
+        if (m.isFreeze) revert MerchantFrozen();
+        emit MintedToUser(msg.sender, user, cashAmount);
         _mint(user, cashAmount);
-        merchant.totalCashReceived += cashAmount;
+        m.totalCashReceived += cashAmount;
         totalMinted += cashAmount;
     }
 
@@ -168,11 +161,11 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      */
     function payMerchant(address user, uint256 amount) external onlyMerchant nonReentrant {
         if (amount == 0 || balanceOf(user) < amount) revert InvalidAmount();
-        Merchant storage merchant = merchantInfoMap[msg.sender];
-        if (merchant.isFreeze) revert MerchantFrozen();
+        Merchant storage m = merchantInfoMap[msg.sender];
+        if (m.isFreeze) revert MerchantFrozen();
         emit PaymentProcessed(msg.sender, user, amount);
         _burn(user, amount);
-        merchant.totalHKDPRecycled += amount;
+        m.totalHKDPRecycled += amount;
         totalBurnt += amount;
     }
 
