@@ -104,7 +104,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @param merchantName Merchant name
      */
     function addMerchant(uint256 printQuota, address merchantAddr, string memory merchantName) external onlyOwner nonReentrant {
-        if (merchantAddr == address(0)) revert InvalidMerchantAddress();
+        if (merchantAddr == address(0) || isMerchant[merchantAddr]) revert InvalidMerchantAddress();
         isMerchant[merchantAddr] = true;
         merchantInfoMap[merchantAddr] = Merchant(printQuota, 0, 0, merchantName, merchantAddr, false);
         if (!isMerchant[merchantAddr]) {
@@ -120,6 +120,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @param merchantAddr Merchant address
      */
     function removeMerchant(address merchantAddr) external onlyOwner {
+        if (!isMerchant[merchantAddr]) revert InvalidMerchantAddress();
         emit MerchantRemoved(merchantAddr);
         uint256 index = merchantIndex[merchantAddr];
         address lastAddr = merchantList[merchantList.length - 1];
@@ -145,8 +146,8 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         if (m.isFreeze) revert MerchantFrozen();
         emit MintedToUser(_msgSender(), user, cashAmount);
         _mint(user, cashAmount);
-        m.totalCashReceived += cashAmount;
-        totalMinted += cashAmount;
+        unchecked { m.totalCashReceived += cashAmount; }
+        unchecked { totalMinted += cashAmount; }
     }
 
     /**
