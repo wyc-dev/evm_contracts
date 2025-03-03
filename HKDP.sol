@@ -174,9 +174,11 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      */
     function modMerchantState(address merchantAddr, bool isFreeze, uint256 printQuota) external onlyOwner {
         Merchant storage m = merchantInfoMap[merchantAddr];
+        if (m.isFreeze != isFreeze) {
+            if (isFreeze) emit MerchantFreeze(merchantAddr);
+            else emit MerchantUnfreeze(merchantAddr);
+        }
         m.isFreeze = isFreeze;
-        if (isFreeze) emit MerchantFreeze(merchantAddr);
-        else emit MerchantUnfreeze(merchantAddr);
         m.printQuota = printQuota;
     }
 
@@ -202,5 +204,5 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     * @dev Allows contract to receive ETH without data
     */
     receive() external payable {}
-    
+
 }
