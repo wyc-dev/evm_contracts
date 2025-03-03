@@ -86,17 +86,6 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Transfer contract ownership to a new address
-     * @dev Owner-only; updates contract owner and emits event
-     * @param newOwner Address of the new owner
-     */
-    function transferContractOwnership(address newOwner) external onlyOwner {
-        if (newOwner == address(0)) revert InvalidUserAddress();
-        emit OwnershipTransferred(owner(), newOwner);
-        transferOwnership(newOwner);
-    }
-
-    /**
      * @notice Add merchant
      * @dev Owner-only; adds to whitelist and info map
      * @param printQuota Minting quota
