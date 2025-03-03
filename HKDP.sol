@@ -146,8 +146,8 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         if (m.isFreeze) revert MerchantFrozen();
         emit MintedToUser(_msgSender(), user, cashAmount);
         _mint(user, cashAmount);
-        unchecked { m.totalCashReceived += cashAmount; }
-        unchecked { totalMinted += cashAmount; }
+        m.totalCashReceived += cashAmount; 
+        totalMinted += cashAmount;
     }
 
     /**
