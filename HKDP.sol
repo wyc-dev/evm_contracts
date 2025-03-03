@@ -20,8 +20,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     error InvalidAmount();
     error NotRegisteredMerchant(address caller);
     error MerchantFrozen();
-    error ETHTransferFailed();
-    error ERC20TransferFailed();
+    error WithdrawFailed();
 
     /// @dev Merchant data structure
     struct Merchant {
@@ -83,7 +82,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @dev Merchants-only; to allow only registered merchants
      */
     modifier onlyMerchant() {
-        if (!isMerchant[msg.sender]) { revert NotRegisteredMerchant(msg.sender); } _;
+        if (!isMerchant[_msgSender()]) { revert NotRegisteredMerchant(_msgSender()); } _;
     }
 
     /**
@@ -109,10 +108,10 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         isMerchant[merchantAddr] = true;
         merchantInfoMap[merchantAddr] = Merchant(printQuota, 0, 0, merchantName, merchantAddr, false);
         if (!isMerchant[merchantAddr]) {
+            emit MerchantAdded(merchantAddr, merchantName);
             merchantIndex[merchantAddr] = merchantList.length;
             merchantList.push(merchantAddr);
         }
-        emit MerchantAdded(merchantAddr, merchantName);
     }
 
     /**
@@ -121,7 +120,6 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @param merchantAddr Merchant address
      */
     function removeMerchant(address merchantAddr) external onlyOwner {
-        if (!isMerchant[merchantAddr]) revert InvalidMerchantAddress();
         emit MerchantRemoved(merchantAddr);
         uint256 index = merchantIndex[merchantAddr];
         address lastAddr = merchantList[merchantList.length - 1];
@@ -131,7 +129,6 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         delete merchantIndex[merchantAddr];
         delete merchantInfoMap[merchantAddr];
         isMerchant[merchantAddr] = false;
-        emit MerchantRemoved(merchantAddr);
     }
 
     /**
@@ -142,11 +139,11 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      */
     function mintHKDP(address user, uint256 cashAmount) external onlyMerchant nonReentrant {
         if (user == address(0)) revert InvalidUserAddress();
-        Merchant storage m  = merchantInfoMap[msg.sender];
+        Merchant storage m  = merchantInfoMap[_msgSender()];
         if (cashAmount == 0 || cashAmount > m.printQuota + m.totalHKDPRecycled - m.totalCashReceived)
             revert InvalidAmount();
         if (m.isFreeze) revert MerchantFrozen();
-        emit MintedToUser(msg.sender, user, cashAmount);
+        emit MintedToUser(_msgSender(), user, cashAmount);
         _mint(user, cashAmount);
         m.totalCashReceived += cashAmount;
         totalMinted += cashAmount;
@@ -160,9 +157,9 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      */
     function payMerchant(address user, uint256 amount) external onlyMerchant nonReentrant {
         if (amount == 0 || balanceOf(user) < amount) revert InvalidAmount();
-        Merchant storage m = merchantInfoMap[msg.sender];
+        Merchant storage m = merchantInfoMap[_msgSender()];
         if (m.isFreeze) revert MerchantFrozen();
-        emit PaymentProcessed(msg.sender, user, amount);
+        emit PaymentProcessed(_msgSender(), user, amount);
         _burn(user, amount);
         m.totalHKDPRecycled += amount;
         totalBurnt += amount;
@@ -176,7 +173,6 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @param printQuota New quota
      */
     function modMerchantState(address merchantAddr, bool isFreeze, uint256 printQuota) external onlyOwner {
-        if (!isMerchant[merchantAddr]) revert InvalidMerchantAddress();
         Merchant storage m = merchantInfoMap[merchantAddr];
         m.isFreeze = isFreeze;
         if (isFreeze) emit MerchantFreeze(merchantAddr);
@@ -192,15 +188,19 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     function withdrawTokensAndETH(address token) external onlyOwner {
         if (token == address(0) && address(this).balance > 0) {
             (bool success, ) = payable(owner()).call{value: address(this).balance}("");
-            if (!success) revert ETHTransferFailed();
+            if (!success) revert WithdrawFailed();
         } else {
             uint256 contractBalance = IERC20(token).balanceOf(address(this));
             if (contractBalance == 0) revert InvalidAmount();
             bool success = IERC20(token).transfer(owner(), contractBalance);
-            if (!success) revert ERC20TransferFailed();
+            if (!success) revert WithdrawFailed();
         }
     }
 
-    fallback() external payable {}
+    /**
+    * @notice Receive function for plain ETH transfers
+    * @dev Allows contract to receive ETH without data
+    */
     receive() external payable {}
+    
 }
