@@ -56,9 +56,6 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     /// @notice Event: Merchant unfrozen
     event MerchantUnfreeze(address indexed merchant);
 
-    /// @notice Event: Merchant removed
-    event MerchantRemoved(address indexed merchant);
-
     /// @notice Event: Merchant added
     event MerchantAdded(address indexed merchant, string merchantName);
 
@@ -73,7 +70,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @dev Initializes with ERC20, ERC20Permit, and Ownable
      */
     constructor(address owner)
-        ERC20("Hong Kong Decentralized Permit (S)", "HKDP")
+        ERC20("Hong Kong Decentralized Permit", "HKDP")
         Ownable(owner)
     {}
 
