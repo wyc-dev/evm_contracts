@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity 0.8.29;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -16,6 +16,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     
     /// @dev Custom errors for gas efficiency
     error InvalidMerchantAddress();
+    error InvalidSpendingRebate();
     error InvalidUserAddress();
     error InvalidAmount();
     error NotRegisteredMerchant(address caller);
@@ -27,19 +28,19 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         uint256 printQuota;         ///< Minting quota
         uint256 totalCashReceived;  ///< Total cash received
         uint256 totalHKDPRecycled;  ///< Total HKDP recycled
+        uint256 spendingRebate;     ///< Merchant address
         string  merchantName;       ///< Merchant name
-        address merchantAddress;    ///< Merchant address
         bool isFreeze;              ///< Freeze status
     }
 
     /// @notice Maps merchant addresses to their information
-    mapping(address merchantAddress => Merchant info) public merchantInfoMap;
+    mapping(address merchant => Merchant info) public merchantInfoMap;
 
     /// @notice Whitelist status of merchant addresses
-    mapping(address merchantAddress => bool isWhitelisted) public isMerchant;
+    mapping(address merchant => bool isWhitelisted) public isMerchant;
 
     /// @notice Maps merchant addresses to their index in merchantList
-    mapping(uint256 index => address merchantAddress) public merchantByIndex;
+    mapping(uint256 index => address merchant) public merchantByIndex;
 
     /// @notice Total HKDP burnt
     uint256 public totalMerchants;
@@ -65,6 +66,9 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     /// @notice Event: Payment processed
     event PaymentProcessed(address indexed merchant, address indexed user, uint256 amount);
 
+    /// @notice Event: Spending Rebate
+    event SpendingRebate(address indexed merchant, address indexed user, uint256 amount, uint256 percentage);
+
     /**
      * @notice Constructor
      * @dev Initializes with ERC20, and Ownable
@@ -86,7 +90,6 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @notice Add merchant
      * @dev Owner-only; adds to whitelist and info map
      * @param printQuota Minting quota
-     * @param merchantAddr Merchant address
      * @param merchantName Merchant name
      */
     function addMerchant(uint256 printQuota, address merchantAddr, string memory merchantName) external onlyOwner nonReentrant {
@@ -95,7 +98,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         isMerchant[merchantAddr] = true;
         merchantByIndex[totalMerchants] = merchantAddr;
         totalMerchants += 1;
-        merchantInfoMap[merchantAddr] = Merchant(printQuota, 0, 0, merchantName, merchantAddr, false);
+        merchantInfoMap[merchantAddr] = Merchant(printQuota, 0, 0, 0, merchantName, false);
     }
 
     /**
@@ -104,8 +107,10 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @param merchantAddr Merchant address
      * @param isFreeze Freeze status
      * @param printQuota New quota
+     * @param spendingRebate Merchant Rebate Rate
      */
-    function modMerchantState(address merchantAddr, bool isFreeze, uint256 printQuota) external onlyOwner {
+    function modMerchantState(address merchantAddr, bool isFreeze, uint256 printQuota, uint256 spendingRebate) external onlyOwner {
+        if (spendingRebate > 10) revert InvalidSpendingRebate();
         Merchant storage m = merchantInfoMap[merchantAddr];
         if (m.isFreeze != isFreeze) {
             if (isFreeze) emit MerchantFreeze(merchantAddr);
@@ -113,6 +118,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         }
         m.isFreeze = isFreeze;
         m.printQuota = printQuota;
+        m.spendingRebate = spendingRebate;
     }
 
     /**
@@ -144,9 +150,11 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         Merchant storage m = merchantInfoMap[_msgSender()];
         if (m.isFreeze) revert MerchantFrozen();
         emit PaymentProcessed(_msgSender(), user, amount);
-        _burn(user, amount);
-        m.totalHKDPRecycled += amount;
-        totalBurnt += amount;
+        emit SpendingRebate(_msgSender(), user, (amount * m.spendingRebate / 100), m.spendingRebate);
+        uint256 finalAmount = (amount * (100 - m.spendingRebate) / 100);
+        _burn(user, finalAmount);
+        m.totalHKDPRecycled += finalAmount;
+        totalBurnt += finalAmount;
     }
 
     /**
