@@ -28,7 +28,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         uint256 printQuota;         ///< Minting quota
         uint256 totalCashReceived;  ///< Total cash received
         uint256 totalHKDPRecycled;  ///< Total HKDP recycled
-        uint256 spendingRebate;     ///< Merchant address
+        uint256 spendingRebate;     ///< Merchant rebate rate
         string  merchantName;       ///< Merchant name
         bool isFreeze;              ///< Freeze status
     }
@@ -42,7 +42,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     /// @notice Maps merchant addresses to their index in merchantList
     mapping(uint256 index => address merchant) public merchantByIndex;
 
-    /// @notice Total HKDP burnt
+    /// @notice Total Merchants in HKDP Chamber
     uint256 public totalMerchants;
 
     /// @notice Total HKDP minted
