@@ -64,10 +64,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     event MintedToUser(address indexed merchant, address indexed user, uint256 amount);
 
     /// @notice Event: Payment processed
-    event PaymentProcessed(address indexed merchant, address indexed user, uint256 amount);
-
-    /// @notice Event: Spending Rebate
-    event SpendingRebate(address indexed merchant, address indexed user, uint256 amount, uint256 percentage);
+    event PaymentProcessed(address indexed merchant, address indexed user, uint256 amount, uint256 rebateAmount);
 
     /**
      * @notice Constructor
@@ -146,12 +143,11 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @param amount Amount to pay
      */
     function payMerchant(address user, uint256 amount) external onlyMerchant nonReentrant {
-        if (amount == 0 || balanceOf(user) < amount) revert InvalidAmount();
         Merchant storage m = merchantInfoMap[_msgSender()];
+        uint256 finalAmount = m.spendingRebate == 0 ? amount : (amount * (100 - m.spendingRebate) / 100);
+        if (amount == 0 || balanceOf(user) < finalAmount) revert InvalidAmount();
         if (m.isFreeze) revert MerchantFrozen();
-        emit PaymentProcessed(_msgSender(), user, amount);
-        emit SpendingRebate(_msgSender(), user, (amount * m.spendingRebate / 100), m.spendingRebate);
-        uint256 finalAmount = (amount * (100 - m.spendingRebate) / 100);
+        emit PaymentProcessed(_msgSender(), user, finalAmount, m.spendingRebate == 0 ? 0 : (amount * m.spendingRebate / 100) );
         _burn(user, finalAmount);
         m.totalHKDPRecycled += finalAmount;
         totalBurnt += finalAmount;
@@ -175,8 +171,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-    * @notice Receive function for plain ETH transfers
-    * @dev Allows contract to receive ETH without data
+    * @notice Receive function for ETH transfers
     */
     receive() external payable {}
 
