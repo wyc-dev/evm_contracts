@@ -35,14 +35,14 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     /// @notice Maps merchant addresses to their information
     mapping(address merchantAddress => Merchant info) public merchantInfoMap;
 
-    /// @notice Maps merchant addresses to their index in merchantList
-    mapping(address merchantAddress => uint256 index) public merchantIndex;
-
     /// @notice Whitelist status of merchant addresses
     mapping(address merchantAddress => bool isWhitelisted) public isMerchant;
 
-    /// @notice List of merchant addresses
-    address[] public merchantList;
+    /// @notice Maps merchant addresses to their index in merchantList
+    mapping(uint256 index => address merchantAddress) public merchantByIndex;
+
+    /// @notice Total HKDP burnt
+    uint256 public totalMerchants;
 
     /// @notice Total HKDP minted
     uint256 public totalMinted;
@@ -73,7 +73,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @dev Initializes with ERC20, ERC20Permit, and Ownable
      */
     constructor(address owner)
-        ERC20("Hong Kong Decentralized Permit", "HKDP")
+        ERC20("Hong Kong Decentralized Permit (S)", "HKDP")
         Ownable(owner)
     {}
 
@@ -94,31 +94,28 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      */
     function addMerchant(uint256 printQuota, address merchantAddr, string memory merchantName) external onlyOwner nonReentrant {
         if (merchantAddr == address(0) || isMerchant[merchantAddr]) revert InvalidMerchantAddress();
+        emit MerchantAdded(merchantAddr, merchantName);
         isMerchant[merchantAddr] = true;
+        merchantByIndex[totalMerchants] = merchantAddr;
+        totalMerchants += 1;
         merchantInfoMap[merchantAddr] = Merchant(printQuota, 0, 0, merchantName, merchantAddr, false);
-        if (!isMerchant[merchantAddr]) {
-            emit MerchantAdded(merchantAddr, merchantName);
-            merchantIndex[merchantAddr] = merchantList.length;
-            merchantList.push(merchantAddr);
-        }
     }
 
     /**
-     * @notice Remove merchant
-     * @dev Owner-only; removes from whitelist and info map
+     * @notice Modify merchant state
+     * @dev Owner-only; updates freeze status and quota
      * @param merchantAddr Merchant address
+     * @param isFreeze Freeze status
+     * @param printQuota New quota
      */
-    function removeMerchant(address merchantAddr) external onlyOwner {
-        if (!isMerchant[merchantAddr]) revert InvalidMerchantAddress();
-        emit MerchantRemoved(merchantAddr);
-        uint256 index = merchantIndex[merchantAddr];
-        address lastAddr = merchantList[merchantList.length - 1];
-        merchantList[index] = lastAddr;
-        merchantIndex[lastAddr] = index;
-        merchantList.pop();
-        delete merchantIndex[merchantAddr];
-        delete merchantInfoMap[merchantAddr];
-        isMerchant[merchantAddr] = false;
+    function modMerchantState(address merchantAddr, bool isFreeze, uint256 printQuota) external onlyOwner {
+        Merchant storage m = merchantInfoMap[merchantAddr];
+        if (m.isFreeze != isFreeze) {
+            if (isFreeze) emit MerchantFreeze(merchantAddr);
+            else emit MerchantUnfreeze(merchantAddr);
+        }
+        m.isFreeze = isFreeze;
+        m.printQuota = printQuota;
     }
 
     /**
@@ -153,23 +150,6 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         _burn(user, amount);
         m.totalHKDPRecycled += amount;
         totalBurnt += amount;
-    }
-
-    /**
-     * @notice Modify merchant state
-     * @dev Owner-only; updates freeze status and quota
-     * @param merchantAddr Merchant address
-     * @param isFreeze Freeze status
-     * @param printQuota New quota
-     */
-    function modMerchantState(address merchantAddr, bool isFreeze, uint256 printQuota) external onlyOwner {
-        Merchant storage m = merchantInfoMap[merchantAddr];
-        if (m.isFreeze != isFreeze) {
-            if (isFreeze) emit MerchantFreeze(merchantAddr);
-            else emit MerchantUnfreeze(merchantAddr);
-        }
-        m.isFreeze = isFreeze;
-        m.printQuota = printQuota;
     }
 
     /**
