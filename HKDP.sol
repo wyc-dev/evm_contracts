@@ -67,10 +67,10 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
 
     /**
      * @notice Constructor
-     * @dev Initializes with ERC20, ERC20Permit, and Ownable
+     * @dev Initializes with ERC20, and Ownable
      */
     constructor(address owner)
-        ERC20("Hong Kong Decentralized Permit", "HKDP")
+        ERC20("Hong Kong Decentralized Permit (S ver.)", "HKDP")
         Ownable(owner)
     {}
 
