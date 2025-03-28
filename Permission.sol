@@ -113,6 +113,7 @@ contract P is ERC20, Ownable, ReentrancyGuard {
      * @notice Modify merchant state
      * @dev Owner-only; updates freeze status and quota
      * @param merchantAddr Merchant address
+     * @param newGuardian New guardian of merchant (only change by contract owner)
      * @param isFreeze Freeze status
      * @param printQuota New quota
      * @param spendingRebate Merchant Rebate Rate
