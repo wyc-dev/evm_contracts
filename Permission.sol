@@ -7,12 +7,12 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
- * @title HKDP Stablecoin
- * @notice Decentralized stablecoin for merchant management and payments
+ * @title Permission RWA Bridging Protocol
+ * @notice Decentralized RWA for merchants management and payments
  * @dev Implements merchant whitelist, minting/burning, and payments using OpenZeppelin
  * @custom:security-contact hopeallgood.unadvised619@passinbox.com
  */
-contract HKDP is ERC20, Ownable, ReentrancyGuard {
+contract P is ERC20, Ownable, ReentrancyGuard {
     
     /// @dev Custom errors for gas efficiency
     error InvalidMerchantAddress();
@@ -20,14 +20,16 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     error InvalidUserAddress();
     error InvalidAmount();
     error NotRegisteredMerchant(address caller);
+    error NotMerchantGuardian(address caller);
     error MerchantFrozen();
     error WithdrawFailed();
 
     /// @dev Merchant data structure
     struct Merchant {
+        address guardian;           ///< Manager
         uint256 printQuota;         ///< Minting quota
         uint256 totalCashReceived;  ///< Total cash received
-        uint256 totalHKDPRecycled;  ///< Total HKDP recycled
+        uint256 totalPRecycled;     ///< Total P recycled
         uint256 spendingRebate;     ///< Merchant rebate rate
         string  merchantName;       ///< Merchant name
         bool isFreeze;              ///< Freeze status
@@ -42,13 +44,13 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     /// @notice Maps merchant addresses to their index in merchantList
     mapping(uint256 index => address merchant) public merchantByIndex;
 
-    /// @notice Total Merchants in HKDP Chamber
+    /// @notice Total Merchants in P Chamber
     uint256 public totalMerchants;
 
-    /// @notice Total HKDP minted
+    /// @notice Total P minted
     uint256 public totalMinted;
 
-    /// @notice Total HKDP burnt
+    /// @notice Total P burnt
     uint256 public totalBurnt;
 
     /// @notice Event: Merchant frozen
@@ -60,7 +62,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
     /// @notice Event: Merchant added
     event MerchantAdded(address indexed merchant, string merchantName);
 
-    /// @notice Event: HKDP minted
+    /// @notice Event: P minted
     event MintedToUser(address indexed merchant, address indexed user, uint256 amount);
 
     /// @notice Event: Payment processed
@@ -71,7 +73,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @dev Initializes with ERC20, and Ownable
      */
     constructor(address owner)
-        ERC20("Hong Kong Decentralized Permit (S ver.)", "HKDP")
+        ERC20("Permission", "P")
         Ownable(owner)
     {}
 
@@ -81,6 +83,14 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      */
     modifier onlyMerchant() {
         if (!isMerchant[_msgSender()]) { revert NotRegisteredMerchant(_msgSender()); } _;
+    }
+
+    /**
+     * @notice Confirm merchant's manager
+     * @dev Guardian-only; to allow only merchant's guardian
+     */
+    modifier onlyGuardian(address merchant) {
+        if (_msgSender() != merchantInfoMap[merchant].guardian) { revert NotMerchantGuardian(_msgSender()); } _;
     }
 
     /**
@@ -95,7 +105,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         isMerchant[merchantAddr] = true;
         merchantByIndex[totalMerchants] = merchantAddr;
         totalMerchants += 1;
-        merchantInfoMap[merchantAddr] = Merchant(printQuota, 0, 0, 0, merchantName, false);
+        merchantInfoMap[merchantAddr] = Merchant(_msgSender(), printQuota, 0, 0, 0, merchantName, false);
     }
 
     /**
@@ -106,28 +116,29 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
      * @param printQuota New quota
      * @param spendingRebate Merchant Rebate Rate
      */
-    function modMerchantState(address merchantAddr, bool isFreeze, uint256 printQuota, uint256 spendingRebate) external onlyOwner {
+    function modMerchantState(address merchantAddr, address newGuardian, bool isFreeze, uint256 printQuota, uint256 spendingRebate) external onlyGuardian(merchantAddr) {
         if (spendingRebate > 10) revert InvalidSpendingRebate();
         Merchant storage m = merchantInfoMap[merchantAddr];
         if (m.isFreeze != isFreeze) {
             if (isFreeze) emit MerchantFreeze(merchantAddr);
             else emit MerchantUnfreeze(merchantAddr);
         }
+        m.guardian = newGuardian;
         m.isFreeze = isFreeze;
         m.printQuota = printQuota;
         m.spendingRebate = spendingRebate;
     }
 
     /**
-     * @notice Mint HKDP tokens
+     * @notice Mint P tokens
      * @dev Merchant-only; mints tokens for user
      * @param user Recipient address
      * @param cashAmount Amount to mint
      */
-    function mintHKDP(address user, uint256 cashAmount) external onlyMerchant nonReentrant {
+    function mintP(address user, uint256 cashAmount) external onlyMerchant nonReentrant {
         if (user == address(0)) revert InvalidUserAddress();
         Merchant storage m  = merchantInfoMap[_msgSender()];
-        if (cashAmount == 0 || cashAmount > m.printQuota + m.totalHKDPRecycled - m.totalCashReceived)
+        if (cashAmount == 0 || cashAmount > m.printQuota + m.totalPRecycled - m.totalCashReceived)
             revert InvalidAmount();
         if (m.isFreeze) revert MerchantFrozen();
         emit MintedToUser(_msgSender(), user, cashAmount);
@@ -138,7 +149,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
 
     /**
      * @notice Process payment
-     * @dev Merchant-only; burns user’s HKDP
+     * @dev Merchant-only; burns user’s P
      * @param user Payer address
      * @param amount Amount to pay
      */
@@ -149,7 +160,7 @@ contract HKDP is ERC20, Ownable, ReentrancyGuard {
         if (m.isFreeze) revert MerchantFrozen();
         emit PaymentProcessed(_msgSender(), user, finalAmount, m.spendingRebate == 0 ? 0 : (amount * m.spendingRebate / 100) );
         _burn(user, finalAmount);
-        m.totalHKDPRecycled += finalAmount;
+        m.totalPRecycled += finalAmount;
         totalBurnt += finalAmount;
     }
 
