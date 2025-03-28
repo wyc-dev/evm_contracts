@@ -89,8 +89,9 @@ contract P is ERC20, Ownable, ReentrancyGuard {
      * @notice Confirm merchant's manager
      * @dev Guardian-only; to allow only merchant's guardian
      */
-    modifier onlyGuardian(address merchant) {
-        if (_msgSender() != merchantInfoMap[merchant].guardian) { revert NotMerchantGuardian(_msgSender()); } _;
+    modifier onlyGuardianAndOwner(address merchant) {
+        if (_msgSender() != merchantInfoMap[merchant].guardian && _msgSender() != owner())
+            { revert NotMerchantGuardian(_msgSender()); } _;
     }
 
     /**
@@ -116,14 +117,16 @@ contract P is ERC20, Ownable, ReentrancyGuard {
      * @param printQuota New quota
      * @param spendingRebate Merchant Rebate Rate
      */
-    function modMerchantState(address merchantAddr, address newGuardian, bool isFreeze, uint256 printQuota, uint256 spendingRebate) external onlyGuardian(merchantAddr) {
+    function modMerchantState(address merchantAddr, address newGuardian, bool isFreeze, uint256 printQuota, uint256 spendingRebate) external onlyGuardianAndOwner(merchantAddr) {
         if (spendingRebate > 10) revert InvalidSpendingRebate();
         Merchant storage m = merchantInfoMap[merchantAddr];
         if (m.isFreeze != isFreeze) {
             if (isFreeze) emit MerchantFreeze(merchantAddr);
             else emit MerchantUnfreeze(merchantAddr);
         }
-        m.guardian = newGuardian;
+        if (_msgSender() == owner()){
+            m.guardian = newGuardian;
+        }
         m.isFreeze = isFreeze;
         m.printQuota = printQuota;
         m.spendingRebate = spendingRebate;
