@@ -7,12 +7,12 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
- * @title Permission RWA Bridging Protocol
+ * @title Token RWA Bridging Protocol
  * @notice Decentralized RWA for merchants management and payments
  * @dev Implements merchant whitelist, minting/burning, and payments using OpenZeppelin
  * @custom:security-contact hopeallgood.unadvised619@passinbox.com
  */
-contract P is ERC20, Ownable, ReentrancyGuard {
+contract Token is ERC20, Ownable, ReentrancyGuard {
     
     /// @dev Custom errors for gas efficiency
     error InvalidMerchantAddress();
@@ -29,7 +29,7 @@ contract P is ERC20, Ownable, ReentrancyGuard {
         address guardian;           ///< Manager
         uint256 printQuota;         ///< Minting quota
         uint256 totalCashReceived;  ///< Total cash received
-        uint256 totalPRecycled;     ///< Total P recycled
+        uint256 totalPRecycled;     ///< Total Token recycled
         uint256 spendingRebate;     ///< Merchant rebate rate
         string  merchantName;       ///< Merchant name
         bool isFreeze;              ///< Freeze status
@@ -44,13 +44,13 @@ contract P is ERC20, Ownable, ReentrancyGuard {
     /// @notice Maps merchant addresses to their index in merchantList
     mapping(uint256 index => address merchant) public merchantByIndex;
 
-    /// @notice Total Merchants in P Chamber
+    /// @notice Total Merchants in Token Chamber
     uint256 public totalMerchants;
 
-    /// @notice Total P minted
+    /// @notice Total Token minted
     uint256 public totalMinted;
 
-    /// @notice Total P burnt
+    /// @notice Total Token burnt
     uint256 public totalBurnt;
 
     /// @notice Event: Merchant frozen
@@ -62,7 +62,7 @@ contract P is ERC20, Ownable, ReentrancyGuard {
     /// @notice Event: Merchant added
     event MerchantAdded(address indexed merchant, string merchantName);
 
-    /// @notice Event: P minted
+    /// @notice Event: Token minted
     event MintedToUser(address indexed merchant, address indexed user, uint256 amount);
 
     /// @notice Event: Payment processed
@@ -73,7 +73,7 @@ contract P is ERC20, Ownable, ReentrancyGuard {
      * @dev Initializes with ERC20, and Ownable
      */
     constructor(address owner)
-        ERC20("Permission", "P")
+        ERC20("Token", "TOKEN")
         Ownable(owner)
     {}
 
@@ -134,12 +134,12 @@ contract P is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Mint P tokens
+     * @notice Mint Tokens
      * @dev Merchant-only; mints tokens for user
      * @param user Recipient address
      * @param cashAmount Amount to mint
      */
-    function mintP(address user, uint256 cashAmount) external onlyMerchant nonReentrant {
+    function mintToken(address user, uint256 cashAmount) external onlyMerchant nonReentrant {
         if (user == address(0)) revert InvalidUserAddress();
         Merchant storage m  = merchantInfoMap[_msgSender()];
         if (cashAmount == 0 || cashAmount > m.printQuota + m.totalPRecycled - m.totalCashReceived)
@@ -153,7 +153,7 @@ contract P is ERC20, Ownable, ReentrancyGuard {
 
     /**
      * @notice Process payment
-     * @dev Merchant-only; burns user’s P
+     * @dev Merchant-only; burns user’s Token
      * @param user Payer address
      * @param amount Amount to pay
      */
