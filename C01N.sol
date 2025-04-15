@@ -16,29 +16,17 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
  */
 contract C01N is ERC20, ReentrancyGuard {
 
-    /// @notice Thrown when a user tries to unstake but has insufficient C01N balance
+    /// @notice Thrown when a user tries to stake / unstake but has insufficient C01N balance
     /// @dev Replaces require statements to save gas and improve readability
-    error InsufficientC01NBalanceForUnstaking();
+    error InsufficientC01NBalance();
 
-    /// @notice Thrown when a user tries to unstake but has insufficient USDC balance
+    /// @notice Thrown when a user tries to stake / unstake but has insufficient USDC balance
     /// @dev Replaces require statements to save gas and improve readability
-    error InsufficientUSDCBalanceForUnstaking();
+    error InsufficientUSDCBalance();
 
-    /// @notice Thrown when a user tries to unstake but has insufficient TOKEN balance
+    /// @notice Thrown when a user tries to stake / unstake but has insufficient TOKEN balance
     /// @dev Replaces require statements to save gas and improve readability
-    error InsufficientTOKENBalanceForUnstaking();
-
-    /// @notice Thrown when a user tries to stake but has insufficient C01N balance
-    /// @dev Replaces require statements to save gas and improve readability
-    error InsufficientC01NBalanceForStaking();
-
-    /// @notice Thrown when a user tries to stake but has insufficient USDC balance
-    /// @dev Replaces require statements to save gas and improve readability
-    error InsufficientUSDCBalanceForStaking();
-    
-    /// @notice Thrown when a user tries to stake but has insufficient TOKEN balance
-    /// @dev Replaces require statements to save gas and improve readability
-    error InsufficientTOKENBalanceForStaking();
+    error InsufficientTOKENBalance();
 
     /// @notice Address of the TOKEN contract used for staking
     /// @dev Hardcoded address; ensure it is correct and immutable across deployments
@@ -133,9 +121,9 @@ contract C01N is ERC20, ReentrancyGuard {
         if (state.isStaking) {
 
             // Unstaking logic
-            if (C01N_balance  < state.C01N_staking ) revert InsufficientC01NBalanceForUnstaking();
-            if (USDC_balance  < state.USDC_staking ) revert InsufficientUSDCBalanceForUnstaking();
-            if (TOKEN_balance < state.TOKEN_staking) revert InsufficientTOKENBalanceForUnstaking();
+            if (C01N_balance  < state.C01N_staking ) revert InsufficientC01NBalance();
+            if (USDC_balance  < state.USDC_staking ) revert InsufficientUSDCBalance();
+            if (TOKEN_balance < state.TOKEN_staking) revert InsufficientTOKENBalance();
 
             uint256 stakingDuration = block.timestamp - state.stakeTime;
             uint256 reward = calculateReward(state.C01N_staking, state.USDC_staking, state.TOKEN_staking, stakingDuration);
@@ -156,9 +144,9 @@ contract C01N is ERC20, ReentrancyGuard {
         } else {
 
             // Staking logic
-            if (C01N_balance  < C01N_amount ) revert InsufficientC01NBalanceForStaking();
-            if (USDC_balance  < USDC_amount ) revert InsufficientUSDCBalanceForStaking();
-            if (TOKEN_balance < TOKEN_amount) revert InsufficientTOKENBalanceForStaking();
+            if (C01N_balance  < C01N_amount ) revert InsufficientC01NBalance();
+            if (USDC_balance  < USDC_amount ) revert InsufficientUSDCBalance();
+            if (TOKEN_balance < TOKEN_amount) revert InsufficientTOKENBalance();
 
             state.isStaking     = true;
             state.stakeTime     = block.timestamp;
