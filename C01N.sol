@@ -16,7 +16,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
  */
 contract C01N is ERC20, ReentrancyGuard {
 
-/// @notice Thrown when a user tries to unstake but has insufficient C01N balance
+    /// @notice Thrown when a user tries to unstake but has insufficient C01N balance
     /// @dev Replaces require statements to save gas and improve readability
     error InsufficientC01NBalanceForUnstaking();
 
