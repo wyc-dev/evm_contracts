@@ -146,10 +146,10 @@ contract C01N is ERC20, ReentrancyGuard {
             state.C01N_staking  = 0;
             state.USDC_staking  = 0;
             state.TOKEN_staking = 0;
-            totalStaker          -= 1;
-            totalStakingTOKEN    -= TOKEN_amount;
-            totalStakingUSDC     -= USDC_amount;
-            totalStakingC01N     -= C01N_amount;
+            totalStaker        -= 1;
+            totalStakingTOKEN  -= TOKEN_amount;
+            totalStakingUSDC   -= USDC_amount;
+            totalStakingC01N   -= C01N_amount;
 
             _mint(_msgSender(), reward);
 
@@ -165,10 +165,10 @@ contract C01N is ERC20, ReentrancyGuard {
             state.C01N_staking  = C01N_amount;
             state.USDC_staking  = USDC_amount;
             state.TOKEN_staking = TOKEN_amount;
-            totalStaker          += 1;
-            totalStakingTOKEN    += TOKEN_amount;
-            totalStakingUSDC     += USDC_amount;
-            totalStakingC01N     += C01N_amount;
+            totalStaker        += 1;
+            totalStakingTOKEN  += TOKEN_amount;
+            totalStakingUSDC   += USDC_amount;
+            totalStakingC01N   += C01N_amount;
 
             emit Staked(_msgSender(), C01N_amount, USDC_amount, TOKEN_amount);
         }
