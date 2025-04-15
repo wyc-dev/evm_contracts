@@ -127,7 +127,6 @@ contract C01N is ERC20, ReentrancyGuard {
             uint256 stakingDuration = block.timestamp - state.stakeTime;
             uint256 reward = calculateReward(state.C01N_staking, state.USDC_staking, state.TOKEN_staking, stakingDuration);
             emit Unstaked(_msgSender(), state.C01N_staking, state.USDC_staking, state.TOKEN_staking, reward);
-            
             state.isStaking     = false;
             state.C01N_minted  += reward;
             state.C01N_staking  = 0;
