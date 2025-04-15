@@ -66,9 +66,9 @@ contract C01N is ERC20, ReentrancyGuard {
 
     /**
      * @notice Struct to store staking details for each user
-     * @dev Used in the stakingInfo mapping to track individual staking accounts
+     * @dev Used in the stakingInfo mapping to track individual staking state
      */
-    struct StakingAccount {
+    struct Superposition {
         /// @notice Indicates whether the user is currently staking
         bool isStaking;
         /// @notice Timestamp when staking began
@@ -85,7 +85,7 @@ contract C01N is ERC20, ReentrancyGuard {
 
     /// @notice Mapping of user addresses to their staking information
     /// @dev Stores staking details for each user, accessible publicly
-    mapping(address User => StakingAccount) public stakingInfo;
+    mapping(address User => Superposition State) public stakingInfo;
 
     /**
      * @notice Emitted when a user stakes tokens
@@ -128,24 +128,24 @@ contract C01N is ERC20, ReentrancyGuard {
         uint256 C01N_balance  = balanceOf(_msgSender());
         uint256 USDC_balance  = IERC20(USDC).balanceOf(_msgSender());
         uint256 TOKEN_balance = IERC20(TOKEN).balanceOf(_msgSender());
-        StakingAccount storage account = stakingInfo[_msgSender()];
+        Superposition storage state = stakingInfo[_msgSender()];
 
-        if (account.isStaking) {
+        if (state.isStaking) {
 
             // Unstaking logic
-            if (C01N_balance  < account.C01N_staking ) revert InsufficientC01NBalanceForUnstaking();
-            if (USDC_balance  < account.USDC_staking ) revert InsufficientUSDCBalanceForUnstaking();
-            if (TOKEN_balance < account.TOKEN_staking) revert InsufficientTOKENBalanceForUnstaking();
+            if (C01N_balance  < state.C01N_staking ) revert InsufficientC01NBalanceForUnstaking();
+            if (USDC_balance  < state.USDC_staking ) revert InsufficientUSDCBalanceForUnstaking();
+            if (TOKEN_balance < state.TOKEN_staking) revert InsufficientTOKENBalanceForUnstaking();
 
-            uint256 stakingDuration = block.timestamp - account.stakeTime;
-            uint256 reward = calculateReward(account.C01N_staking, account.USDC_staking, account.TOKEN_staking, stakingDuration);
-            emit Unstaked(_msgSender(), account.C01N_staking, account.USDC_staking, account.TOKEN_staking, reward);
+            uint256 stakingDuration = block.timestamp - state.stakeTime;
+            uint256 reward = calculateReward(state.C01N_staking, state.USDC_staking, state.TOKEN_staking, stakingDuration);
+            emit Unstaked(_msgSender(), state.C01N_staking, state.USDC_staking, state.TOKEN_staking, reward);
 
-            account.isStaking     = false;
-            account.C01N_minted  += reward;
-            account.C01N_staking  = 0;
-            account.USDC_staking  = 0;
-            account.TOKEN_staking = 0;
+            state.isStaking     = false;
+            state.C01N_minted  += reward;
+            state.C01N_staking  = 0;
+            state.USDC_staking  = 0;
+            state.TOKEN_staking = 0;
             totalStaker          -= 1;
             totalStakingTOKEN    -= TOKEN_amount;
             totalStakingUSDC     -= USDC_amount;
@@ -160,11 +160,11 @@ contract C01N is ERC20, ReentrancyGuard {
             if (USDC_balance  < USDC_amount ) revert InsufficientUSDCBalanceForStaking();
             if (TOKEN_balance < TOKEN_amount) revert InsufficientTOKENBalanceForStaking();
 
-            account.isStaking     = true;
-            account.stakeTime     = block.timestamp;
-            account.C01N_staking  = C01N_amount;
-            account.USDC_staking  = USDC_amount;
-            account.TOKEN_staking = TOKEN_amount;
+            state.isStaking     = true;
+            state.stakeTime     = block.timestamp;
+            state.C01N_staking  = C01N_amount;
+            state.USDC_staking  = USDC_amount;
+            state.TOKEN_staking = TOKEN_amount;
             totalStaker          += 1;
             totalStakingTOKEN    += TOKEN_amount;
             totalStakingUSDC     += USDC_amount;
