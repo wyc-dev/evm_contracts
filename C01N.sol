@@ -97,7 +97,6 @@ contract C01N is ERC20, ReentrancyGuard {
     /**
      * @notice Constructor to initialize the C01N token contract
      * @dev Sets up the ERC20 token with name "Superposition Coin" and symbol "C01N".
-     *      The owner parameter is currently unused and could be removed for clarity.
      */
     constructor() ERC20("Superposition Coin", "C01N"){}
 
@@ -128,6 +127,7 @@ contract C01N is ERC20, ReentrancyGuard {
             uint256 stakingDuration = block.timestamp - state.stakeTime;
             uint256 reward = calculateReward(state.C01N_staking, state.USDC_staking, state.TOKEN_staking, stakingDuration);
             emit Unstaked(_msgSender(), state.C01N_staking, state.USDC_staking, state.TOKEN_staking, reward);
+            
             state.isStaking     = false;
             state.C01N_minted  += reward;
             state.C01N_staking  = 0;
@@ -145,7 +145,7 @@ contract C01N is ERC20, ReentrancyGuard {
             if (C01N_balance  < C01N_amount ) revert InsufficientC01NBalance();
             if (USDC_balance  < USDC_amount ) revert InsufficientUSDCBalance();
             if (TOKEN_balance < TOKEN_amount) revert InsufficientTOKENBalance();
-            
+
             state.isStaking     = true;
             state.stakeTime     = block.timestamp;
             state.C01N_staking  = C01N_amount;
