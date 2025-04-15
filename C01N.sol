@@ -16,6 +16,30 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
  */
 contract C01N is ERC20, ReentrancyGuard {
 
+/// @notice Thrown when a user tries to unstake but has insufficient C01N balance
+    /// @dev Replaces require statements to save gas and improve readability
+    error InsufficientC01NBalanceForUnstaking();
+
+    /// @notice Thrown when a user tries to unstake but has insufficient USDC balance
+    /// @dev Replaces require statements to save gas and improve readability
+    error InsufficientUSDCBalanceForUnstaking();
+
+    /// @notice Thrown when a user tries to unstake but has insufficient TOKEN balance
+    /// @dev Replaces require statements to save gas and improve readability
+    error InsufficientTOKENBalanceForUnstaking();
+
+    /// @notice Thrown when a user tries to stake but has insufficient C01N balance
+    /// @dev Replaces require statements to save gas and improve readability
+    error InsufficientC01NBalanceForStaking();
+
+    /// @notice Thrown when a user tries to stake but has insufficient USDC balance
+    /// @dev Replaces require statements to save gas and improve readability
+    error InsufficientUSDCBalanceForStaking();
+    
+    /// @notice Thrown when a user tries to stake but has insufficient TOKEN balance
+    /// @dev Replaces require statements to save gas and improve readability
+    error InsufficientTOKENBalanceForStaking();
+
     /// @notice Address of the TOKEN contract used for staking
     /// @dev Hardcoded address; ensure it is correct and immutable across deployments
     address public constant TOKEN = address(0xa1B68A58B1943Ba90703645027a10F069770ED39);
@@ -40,10 +64,6 @@ contract C01N is ERC20, ReentrancyGuard {
     /// @dev Tracks declared C01N staking amounts for reward calculation
     uint256 public totalStakingC01N;
 
-    /// @notice Total amount of C01N tokens minted as rewards
-    /// @dev Updated when rewards are minted during unstaking
-    uint256 public total_C01N_minted;
-
     /**
      * @notice Struct to store staking details for each user
      * @dev Used in the stakingInfo mapping to track individual staking accounts
@@ -65,7 +85,7 @@ contract C01N is ERC20, ReentrancyGuard {
 
     /// @notice Mapping of user addresses to their staking information
     /// @dev Stores staking details for each user, accessible publicly
-    mapping(address => StakingAccount) public stakingInfo;
+    mapping(address User => StakingAccount) public stakingInfo;
 
     /**
      * @notice Emitted when a user stakes tokens
@@ -90,11 +110,8 @@ contract C01N is ERC20, ReentrancyGuard {
      * @notice Constructor to initialize the C01N token contract
      * @dev Sets up the ERC20 token with name "Superposition Coin" and symbol "C01N".
      *      The owner parameter is currently unused and could be removed for clarity.
-     * @param owner Address of the contract deployer (unused in current implementation)
      */
-    constructor(address owner)
-        ERC20("Superposition Coin", "C01N")
-    {}
+    constructor() ERC20("Superposition Coin", "C01N"){}
 
     /**
      * @notice Allows a user to stake or unstake tokens and mint rewards
@@ -107,54 +124,53 @@ contract C01N is ERC20, ReentrancyGuard {
      * @param TOKEN_amount Amount of TOKEN to stake or unstake
      */
     function PoR_staking(uint256 C01N_amount, uint256 USDC_amount, uint256 TOKEN_amount) external nonReentrant {
-        uint256 C01N_balance = balanceOf(msg.sender);
-        uint256 USDC_balance = IERC20(USDC).balanceOf(msg.sender);
-        uint256 TOKEN_balance = IERC20(TOKEN).balanceOf(msg.sender);
+        
+        uint256 C01N_balance  = balanceOf(_msgSender());
+        uint256 USDC_balance  = IERC20(USDC).balanceOf(_msgSender());
+        uint256 TOKEN_balance = IERC20(TOKEN).balanceOf(_msgSender());
         StakingAccount storage account = stakingInfo[_msgSender()];
 
         if (account.isStaking) {
 
             // Unstaking logic
-            require(C01N_balance >= account.C01N_staking, "Insufficient C01N balance for unstaking");
-            require(USDC_balance >= account.USDC_staking, "Insufficient USDC balance for unstaking");
-            require(TOKEN_balance >= account.TOKEN_staking, "Insufficient TOKEN balance for unstaking");
+            if (C01N_balance  < account.C01N_staking ) revert InsufficientC01NBalanceForUnstaking();
+            if (USDC_balance  < account.USDC_staking ) revert InsufficientUSDCBalanceForUnstaking();
+            if (TOKEN_balance < account.TOKEN_staking) revert InsufficientTOKENBalanceForUnstaking();
 
             uint256 stakingDuration = block.timestamp - account.stakeTime;
             uint256 reward = calculateReward(account.C01N_staking, account.USDC_staking, account.TOKEN_staking, stakingDuration);
+            emit Unstaked(_msgSender(), account.C01N_staking, account.USDC_staking, account.TOKEN_staking, reward);
 
-            account.isStaking = false;
-            account.C01N_minted += reward;
-            emit Unstaked(msg.sender, account.C01N_staking, account.USDC_staking, account.TOKEN_staking, reward);
-            account.C01N_staking = 0;
-            account.USDC_staking = 0;
+            account.isStaking     = false;
+            account.C01N_minted  += reward;
+            account.C01N_staking  = 0;
+            account.USDC_staking  = 0;
             account.TOKEN_staking = 0;
-            totalStaker -= 1;
-            totalStakingTOKEN -= TOKEN_amount;
-            totalStakingUSDC -= USDC_amount;
-            totalStakingC01N -= C01N_amount;
+            totalStaker          -= 1;
+            totalStakingTOKEN    -= TOKEN_amount;
+            totalStakingUSDC     -= USDC_amount;
+            totalStakingC01N     -= C01N_amount;
 
-            _mint(msg.sender, reward);
-            total_C01N_minted += reward;
+            _mint(_msgSender(), reward);
 
         } else {
 
             // Staking logic
-            require(C01N_balance >= C01N_amount, "Insufficient C01N balance for staking");
-            require(USDC_balance >= USDC_amount, "Insufficient USDC balance for staking");
-            require(TOKEN_balance >= TOKEN_amount, "Insufficient TOKEN balance for staking");
+            if (C01N_balance  < C01N_amount ) revert InsufficientC01NBalanceForStaking();
+            if (USDC_balance  < USDC_amount ) revert InsufficientUSDCBalanceForStaking();
+            if (TOKEN_balance < TOKEN_amount) revert InsufficientTOKENBalanceForStaking();
 
-            account.isStaking = true;
-            account.stakeTime = block.timestamp;
-            account.C01N_staking = C01N_amount;
-            account.USDC_staking = USDC_amount;
+            account.isStaking     = true;
+            account.stakeTime     = block.timestamp;
+            account.C01N_staking  = C01N_amount;
+            account.USDC_staking  = USDC_amount;
             account.TOKEN_staking = TOKEN_amount;
+            totalStaker          += 1;
+            totalStakingTOKEN    += TOKEN_amount;
+            totalStakingUSDC     += USDC_amount;
+            totalStakingC01N     += C01N_amount;
 
-            totalStaker += 1;
-            totalStakingTOKEN += TOKEN_amount;
-            totalStakingUSDC += USDC_amount;
-            totalStakingC01N += C01N_amount;
-
-            emit Staked(msg.sender, C01N_amount, USDC_amount, TOKEN_amount);
+            emit Staked(_msgSender(), C01N_amount, USDC_amount, TOKEN_amount);
         }
     }
 
@@ -173,10 +189,10 @@ contract C01N is ERC20, ReentrancyGuard {
         pure 
         returns (uint256) 
     {
-        uint256 secondsInYear = 31536000; // 365 days
+        uint256 secondsInYear   = 31536000; // 365 days
         uint256 rewardFromC01N  = (C01N_staking  * stakingDuration * 4)  / (100 * secondsInYear);
         uint256 rewardFromUSDC  = (USDC_staking  * stakingDuration * 8)  / (100 * secondsInYear);
         uint256 rewardFromTOKEN = (TOKEN_staking * stakingDuration * 12) / (100 * secondsInYear);
-        return rewardFromC01N + rewardFromUSDC + rewardFromTOKEN;
+        return  rewardFromC01N  + rewardFromUSDC + rewardFromTOKEN;
     }
 }
