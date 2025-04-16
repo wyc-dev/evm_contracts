@@ -7,7 +7,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 
 /**
  * @title Superposition Coin (C01N)
- * @notice This contract allows users to mint C01N tokens by Proof of Reserve (PoR) stakes of USDC and TOKEN.
+ * @notice This contract allows users to mint C01N tokens by Proof of Reserve (PoR) stakes of C01N and TOKEN.
  *         Users will not approve or transfer their tokens; instead, they declare the amounts when stake and unstake,
  *         and based on that, they can earn C01N rewards over time.
  * @dev The contract inherits from ERC20 for standard token functionality and ReentrancyGuard to prevent reentrancy attacks.
