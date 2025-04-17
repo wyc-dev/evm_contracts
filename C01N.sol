@@ -32,10 +32,6 @@ contract C01N is ERC20, ReentrancyGuard {
     /// @dev Hardcoded address; ensure it is correct and immutable across deployments
     address public constant TOKEN = address(0xa1B68A58B1943Ba90703645027a10F069770ED39);
 
-    /// @notice Interest of RoR staking with C01N reward
-    /// @dev Incremented when users unstake, and incremented when more stakers
-    uint256 public interestRate = 12;
-
     /// @notice Total number of unique stakers in the contract
     /// @dev Incremented when a new user stakes, decremented when they unstake
     uint256 public totalStaker;
@@ -113,18 +109,16 @@ contract C01N is ERC20, ReentrancyGuard {
             // Unstaking logic
             if (C01N_balance  < state.C01N_staking ) revert InsufficientC01NBalance();
             if (TOKEN_balance < state.TOKEN_staking) revert InsufficientTOKENBalance();
-
             uint256 stakingDuration = block.timestamp - state.stakeTime;
             uint256 reward = calculateReward(state.C01N_staking, state.TOKEN_staking, stakingDuration);
             emit Unstaked(_msgSender(), state.C01N_staking, state.TOKEN_staking, reward);
-            state.isStaking     = false;
-            state.C01N_minted  += reward;
+            totalStaker        -= 1;
+            totalStakingTOKEN  -= state.TOKEN_staking;
+            totalStakingC01N   -= state.C01N_staking;
             state.C01N_staking  = 0;
             state.TOKEN_staking = 0;
-            totalStaker        -= 1;
-            totalStakingTOKEN  -= TOKEN_amount;
-            totalStakingC01N   -= C01N_amount;
-            interestRate        = interestRate * 10002 / 10000;
+            state.isStaking     = false;
+            state.C01N_minted  += reward;
             _mint(_msgSender(), reward);
 
         } else {
@@ -132,35 +126,58 @@ contract C01N is ERC20, ReentrancyGuard {
             // Staking logic
             if (C01N_balance  < C01N_amount ) revert InsufficientC01NBalance();
             if (TOKEN_balance < TOKEN_amount) revert InsufficientTOKENBalance();
-
             state.isStaking     = true;
             state.stakeTime     = block.timestamp;
             state.C01N_staking  = C01N_amount;
             state.TOKEN_staking = TOKEN_amount;
             totalStaker        += 1;
-            totalStakingTOKEN  += TOKEN_amount;
-            totalStakingC01N   += C01N_amount;
-            interestRate        = interestRate * 9999 / 10000;
+            totalStakingC01N   += state.C01N_staking;
+            totalStakingTOKEN  += state.TOKEN_staking;
             emit Staked(_msgSender(), C01N_amount, TOKEN_amount);
 
         }
     }
 
     /**
-     * @notice Calculates the reward for staking based on duration and staked amounts
-     * @dev Uses a simple linear reward formula with different rates for C01N (4%), USDC (8%), and TOKEN (12%) per year.
-     *      Rewards are proportional to staking duration and normalized by seconds in a year (365 days).
-     * @param C01N_staking Amount of C01N staked
-     * @param TOKEN_staking Amount of TOKEN staked
-     * @param stakingDuration Duration of staking in seconds
-     * @return uint256 The total reward in C01N tokens
-     */
+    * @notice Calculates the reward for staking based on duration and staked amounts
+    * @dev Reward rate adjusts dynamically to prevent inflation, based on the ratio of total staked amount (C01N + TOKEN) to the sum of total staked amount and total supply.
+    *      Base rate is 16, scaled by (100 - stakingRatio) / 100, where stakingRatio = (totalStaking * 100) / (totalStaking + totalSupply).
+    *      Returns 0 if either total staking or total supply is 0.
+    *      Uses assembly to optimize state reads and mathematical operations for gas efficiency.
+    * @param C01N_staking Amount of C01N staked
+    * @param TOKEN_staking Amount of TOKEN staked
+    * @param stakingDuration Duration of staking in seconds
+    * @return uint256 The total reward in C01N tokens
+    */
     function calculateReward(uint256 C01N_staking, uint256 TOKEN_staking, uint256 stakingDuration) 
         public 
         view 
         returns (uint256) 
     {
-        uint256 secondsInYear   = 31536000; // 365 days
-        return ((C01N_staking + TOKEN_staking)  * stakingDuration * interestRate) / (100 * secondsInYear);
+
+        uint256 totalStaking;
+        uint256 totalSupply;
+        assembly {
+            totalStaking := add(sload(totalStakingC01N.slot), sload(totalStakingTOKEN.slot))
+            let ptr := mload(0x40)
+            mstore(ptr, 0x18160ddd00000000000000000000000000000000000000000000000000000000) // totalSupply selector
+            let success := staticcall(gas(), address(), ptr, 0x04, ptr, 0x20)
+            if iszero(success) { revert(0, 0) }
+            totalSupply := mload(ptr)
+        }
+        if (totalStaking == 0 || totalSupply == 0) { return 0; }
+        uint256 stakingRatio;
+        uint256 adjustedInterestRate;
+        uint256 reward;
+        assembly {
+            let denominator := add(totalStaking, totalSupply)
+            stakingRatio := div(mul(totalStaking, 100), denominator)
+            adjustedInterestRate := div(mul(16, sub(100, stakingRatio)), 100)
+            let totalStaked   := add(C01N_staking, TOKEN_staking)
+            reward := div(mul(mul(totalStaked, stakingDuration), adjustedInterestRate), mul(100, 31536000)) // secondsInYear := 31536000
+        }
+        
+        return reward;
+
     }
 }
