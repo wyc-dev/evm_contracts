@@ -99,7 +99,6 @@ contract C01N is ERC20, ReentrancyGuard {
      */
     function PoR_staking(uint256 C01N_amount, uint256 TOKEN_amount) external nonReentrant {
         
-        if (C01N_amount <= 0 && TOKEN_amount <= 0) revert InvalidAmount();
         uint256 C01N_balance  = balanceOf(_msgSender());
         uint256 TOKEN_balance = IERC20(TOKEN).balanceOf(_msgSender());
         Superposition storage state = stakingInfo[_msgSender()];
@@ -124,6 +123,7 @@ contract C01N is ERC20, ReentrancyGuard {
         } else {
 
             // Staking logic
+            if (C01N_amount <= 0 && TOKEN_amount <= 0) revert InvalidAmount();
             if (C01N_balance  < C01N_amount ) revert InsufficientC01NBalance();
             if (TOKEN_balance < TOKEN_amount) revert InsufficientTOKENBalance();
             state.isStaking     = true;
