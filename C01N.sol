@@ -165,18 +165,18 @@ contract C01N is ERC20, ReentrancyGuard {
             if iszero(success) { revert(0, 0) }
             totalSupply := mload(ptr)
         }
+
         if (totalStaking == 0 || totalSupply == 0) { return 0; }
+        
         uint256 stakingRatio;
         uint256 adjustedInterestRate;
         uint256 reward;
         assembly {
-            let denominator := add(totalStaking, totalSupply)
-            stakingRatio := div(mul(totalStaking, 100), denominator)
+            stakingRatio := div(mul(totalStaking, 100), add(totalStaking, totalSupply))
             adjustedInterestRate := div(mul(16, sub(100, stakingRatio)), 100)
-            let totalStaked   := add(C01N_staking, TOKEN_staking)
-            reward := div(mul(mul(totalStaked, stakingDuration), adjustedInterestRate), mul(100, 31536000)) // secondsInYear := 31536000
+            reward := div(mul(mul(add(C01N_staking, TOKEN_staking), stakingDuration), adjustedInterestRate), mul(100, 31536000)) // secondsInYear := 31536000
         }
-        
+
         return reward;
 
     }
